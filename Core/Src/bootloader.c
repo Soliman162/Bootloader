@@ -44,7 +44,7 @@ static inline void Bootloader_Change_Read_Protection_Level(uint8_t *Host_Buffer)
 static CRC_VERVICATION BootLoader_CRC_verfiy(uint8_t *Data_arr,uint8_t Data_Length,uint32_t CP_host_crc);
 static void BL_send_ACK(uint8_t Replay_Length);
 static void BL_send_NACK(void);
-
+static void JUMP_To_User_App(void);
 static void Send_Data_To_HOST(uint8_t *pdata , uint8_t Size);
 
 static inline void BL_DEBUG_MESSAGE(char *format,...)
@@ -61,7 +61,7 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 {
 	BL_STATUS cmd_status = BL_ACK;
 	uint8_t Cmd_Size = 0;
-	char Rec_buffer[HOST_CMD_BUFFER_SIZE] = {'\0'};
+	uint8_t Rec_buffer[HOST_CMD_BUFFER_SIZE] = {'\0'};
 
 	if( HAL_UART_Receive(BL_HOST_CMD_UART, (uint8_t*)Rec_buffer, 1, HAL_MAX_DELAY) != HAL_OK )
 	{
@@ -144,12 +144,12 @@ CRC_VERVICATION BootLoader_CRC_verfiy(uint8_t *Data_arr,uint8_t Data_Length,uint
 {
 	CRC_VERVICATION CRC_status = CRC_MATCH;
 	uint32_t CRC_calculated = 0;
-	uint8_t Data_Counter = 0;
+	uint8_t Data_Counter ;
 	uint32_t Data_temp = 0;
 
 	__HAL_CRC_DR_RESET(BL_CRC_ENGINE);
 
-	for(Data_Counter; Data_Counter < Data_Length ;Data_Counter++)
+	for(Data_Counter = 0; Data_Counter < Data_Length ;Data_Counter++)
 	{
 		Data_temp = (uint32_t)Data_arr[Data_Counter];
 		CRC_calculated = HAL_CRC_Accumulate(BL_CRC_ENGINE, &Data_temp, 1);
@@ -199,7 +199,6 @@ void Bootloader_Get_Version(uint8_t *Host_Buffer)
 void Bootloader_Get_Help(uint8_t *Host_Buffer)
 {
 	CRC_VERVICATION CRC_status = CRC_MATCH;
-	uint8_t BL_version[4] = {VENDOR_ID,BL_SW_MAJOR_VERSION,BL_SW_MINOR_VERSION,BL_SW_PATCH_VERSION};
 	uint16_t Pcaket_length = Host_Buffer[0] + 1;
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
 
@@ -208,7 +207,7 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 	if( CRC_status == CRC_MATCH )
 	{
 		BL_send_ACK(12);
-		Send_Data_To_HOST(BL_CMD_ARR, 12);
+		Send_Data_To_HOST( (uint8_t *)(&BL_CMD_ARR[0]), 12);
 	}
 	else
 	{
@@ -218,7 +217,6 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 {
 	CRC_VERVICATION CRC_status = CRC_MATCH;
-	uint8_t BL_version[4] = {VENDOR_ID,BL_SW_MAJOR_VERSION,BL_SW_MINOR_VERSION,BL_SW_PATCH_VERSION};
 	uint16_t Pcaket_length = Host_Buffer[0] + 1;
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
 	uint16_t MCU_ID = (uint16_t)(DBGMCU->IDCODE & 0x0000FFF);
@@ -270,4 +268,15 @@ void Bootloader_Read_OTP(uint8_t *Host_Buffer)
 void Bootloader_Change_Read_Protection_Level(uint8_t *Host_Buffer)
 {
 
+}
+
+void JUMP_To_User_App(void)
+{
+	uint32_t APP_MSP = *((volatile uint32_t *)FLASH_SECTOR2_BASE_ADDRESS);
+	uint32_t APP_Entry_Point = *(( volatile uint32_t *)(APP_MSP+4));
+	pvfun Reset_Handler = (pvfun)APP_Entry_Point;
+	__set_MSP(APP_MSP);
+	HAL_DeInit();
+	HAL_RCC_DeInit();
+	Reset_Handler();
 }

@@ -45,7 +45,11 @@
 #define BL_SEND_NACK	0xAB
 #define BL_SEND_ACK		0xCD
 
+#define FLASH_SECTOR2_BASE_ADDRESS	0x8008000UL
 
+
+
+typedef void (*pvfun)(void);
 typedef enum
 {
 	CRC_NO_MATCH = 0,
