@@ -1,0 +1,8 @@
+.cproject 
+.mxproject  
+.project  
+.settings/  
+BootLoader.ioc 
+Debug/ 
+Release/
+
