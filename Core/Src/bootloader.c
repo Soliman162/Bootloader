@@ -46,8 +46,9 @@ static void BL_send_ACK(uint8_t Replay_Length);
 static void BL_send_NACK(void);
 static void JUMP_To_User_App(void);
 static void Send_Data_To_HOST(uint8_t *pdata , uint8_t Size);
+static ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address);
 
-static inline void BL_DEBUG_MESSAGE(char *format,...)
+void BL_DEBUG_MESSAGE(char *format,...)
 {
 	char Message[MESSAGE_DEBUG_BUFFER_SIZE]={'\0'};
 	va_list args;
@@ -239,7 +240,34 @@ void Bootloader_Read_Protection_Level(uint8_t *Host_Buffer)
 }
 void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 {
+	CRC_VERVICATION CRC_status = CRC_MATCH;
+	uint16_t Pcaket_length = Host_Buffer[0] + 1;
+	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
+	uint32_t Jump_Addr = 0;
+	ADDR_VALID_CHECK Check = ADDR_INVALID;
 
+	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
+
+	if( CRC_status == CRC_MATCH )
+	{
+		BL_send_ACK(1);
+		Jump_Addr = (uint32_t *)Host_Buffer[2];
+		Check = Address_Verfication_Check(Jump_Addr);
+		Send_Data_To_HOST((uint8_t *)&Check, 1);
+		if( Check == ADDR_VALID )
+		{
+			BL_DEBUG_MESSAGE("Address valid 0x%X\r\n",Jump_Addr);
+			pvfun address = (pvfun)(Jump_Addr+1) ;
+			address();
+		}else
+		{
+			BL_DEBUG_MESSAGE("Address not valid 0x%X\r\n",Jump_Addr);
+		}
+	}
+	else
+	{
+		BL_send_NACK();
+	}
 }
 void Bootloader_Erase_Flash(uint8_t *Host_Buffer)
 {
@@ -279,4 +307,19 @@ void JUMP_To_User_App(void)
 	HAL_DeInit();
 	HAL_RCC_DeInit();
 	Reset_Handler();
+}
+
+ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
+{
+	ADDR_VALID_CHECK Check_addr = ADDR_INVALID;
+	if( (cp_Address >= FLASH_BASE) && (cp_Address <= FLASH_END_ADDRESS) )
+	{
+		Check_addr = ADDR_VALID;
+	}
+	else if( (cp_Address >= SRAM_BASE) && (cp_Address <= SRAM_END_ADDRESS) )
+	{
+		Check_addr = ADDR_VALID;
+	}
+
+	return Check_addr;
 }

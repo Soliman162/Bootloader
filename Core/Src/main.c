@@ -98,6 +98,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  BL_DEBUG_MESSAGE("Hello from Bootloader \r\n");
   while (1)
   {
     /* USER CODE END WHILE */

@@ -11,7 +11,7 @@
 
 // command length 1byte + command_code 1byte +  details + crc 4bytes
 
-#define BL_DEBUG_UART			&huart3
+#define BL_DEBUG_UART			&huart2
 #define BL_HOST_CMD_UART		&huart3
 #define BL_CRC_ENGINE			&hcrc
 
@@ -47,7 +47,11 @@
 
 #define FLASH_SECTOR2_BASE_ADDRESS	0x8008000UL
 
+#define FLASH_SIZE	(64*1024)
+#define SRAM_SIZE	(20*1024)
 
+#define FLASH_END_ADDRESS		(FLASH_BASE+FLASH_SIZE)
+#define SRAM_END_ADDRESS		(SRAM_BASE+SRAM_SIZE)
 
 typedef void (*pvfun)(void);
 typedef enum
@@ -62,8 +66,15 @@ typedef enum
 	BL_ACK
 }BL_STATUS;
 
-BL_STATUS BL_Fetch_Host_CMD(void);
+typedef enum
+{
+	ADDR_INVALID = 0,
+	ADDR_VALID
 
+}ADDR_VALID_CHECK;
+
+BL_STATUS BL_Fetch_Host_CMD(void);
+void BL_DEBUG_MESSAGE(char *format,...);
 
 
 #endif /* INC_BOOTLOADER_H_ */
