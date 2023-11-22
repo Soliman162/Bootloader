@@ -71,8 +71,6 @@ int main(void)
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
-//	GPIO_InitTypeDef test = (GPIO_InitTypeDef){GPIO_PIN_0,GPIO_MODE_OUTPUT_PP,GPIO_NOPULL,GPIO_SPEED_FREQ_MEDIUM};
-//	HAL_GPIO_WritePin(GPIOA, test.Pin , GPIO_PIN_RESET);
 
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
@@ -99,12 +97,10 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  BL_DEBUG_MESSAGE("Hello from Bootloader \r\n");
+//  BL_DEBUG_MESSAGE("Hello from Bootloader \r\n");
   while (1)
   {
     /* USER CODE END WHILE */
-//	  HAL_GPIO_TogglePin(GPIOA, test.Pin);
-//	  HAL_Delay(1000);
 	  BL_Fetch_Host_CMD();
     /* USER CODE BEGIN 3 */
   }
