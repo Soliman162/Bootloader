@@ -53,6 +53,11 @@
 #define FLASH_END_ADDRESS		(FLASH_BASE+FLASH_SIZE)
 #define SRAM_END_ADDRESS		(SRAM_BASE+SRAM_SIZE)
 
+
+#define FLASH_ERASE_COMPLETE	0xFFFFFFFFUL
+#define MAX_NUMBER_OF_PAGES		64
+#define MASS_ERASE_CMD			0xFFUL
+
 typedef void (*pvfun)(void);
 typedef enum
 {
@@ -72,6 +77,24 @@ typedef enum
 	ADDR_VALID
 
 }ADDR_VALID_CHECK;
+
+typedef enum
+{
+	FLASH_ERASE_FAILED=0,
+	FLASH_ERASE_SUCCEDD
+}FLASH_ERASE_STATUS;
+
+typedef enum
+{
+	FLASH_WRITE_FAILED=0,
+	FLASH_WRITE_SUCCEDD
+}FLASH_WRITE_STATUS;
+
+typedef enum
+{
+	FLASH_LOCKED=0,
+	FLASH_UNLOCKED
+}FLASH_LOCK_STATUS;
 
 BL_STATUS BL_Fetch_Host_CMD(void);
 void BL_DEBUG_MESSAGE(char *format,...);

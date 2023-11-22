@@ -47,6 +47,9 @@ static void BL_send_NACK(void);
 static void JUMP_To_User_App(void);
 static void Send_Data_To_HOST(uint8_t *pdata , uint8_t Size);
 static ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address);
+static FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPages);
+static FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_start_address,uint16_t Payload_Length);
+static uint8_t GET_Flash_protection_Level(void);
 
 void BL_DEBUG_MESSAGE(char *format,...)
 {
@@ -234,9 +237,32 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 		BL_send_NACK();
 	}
 }
+uint8_t GET_Flash_protection_Level(void)
+{
+	FLASH_OBProgramInitTypeDef OBProgram;
+	HAL_FLASHEx_OBGetConfig(&OBProgram);
+	return (uint8_t)(OBProgram.RDPLevel);
+}
+
 void Bootloader_Read_Protection_Level(uint8_t *Host_Buffer)
 {
+	CRC_VERVICATION CRC_status = CRC_MATCH;
+	uint16_t Pcaket_length = Host_Buffer[0] + 1;
+	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
+	uint8_t RPD_level = 0xEE;
 
+	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
+
+	if( CRC_status == CRC_MATCH )
+	{
+		BL_send_ACK(1);
+		RPD_level = GET_Flash_protection_Level();
+		Send_Data_To_HOST((uint8_t *)&RPD_level, 1);
+	}
+	else
+	{
+		BL_send_NACK();
+	}
 }
 void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 {
@@ -251,7 +277,7 @@ void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 	if( CRC_status == CRC_MATCH )
 	{
 		BL_send_ACK(1);
-		Jump_Addr = (uint32_t *)Host_Buffer[2];
+		Jump_Addr = *((uint32_t *)&Host_Buffer[2]);
 		Check = Address_Verfication_Check(Jump_Addr);
 		Send_Data_To_HOST((uint8_t *)&Check, 1);
 		if( Check == ADDR_VALID )
@@ -269,13 +295,156 @@ void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 		BL_send_NACK();
 	}
 }
-void Bootloader_Erase_Flash(uint8_t *Host_Buffer)
+
+FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPages)
 {
+	FLASH_ERASE_STATUS status_Check = FLASH_ERASE_SUCCEDD;
+	HAL_StatusTypeDef Erase_check = HAL_OK;
+	uint32_t PageError = 0;
+	FLASH_EraseInitTypeDef Flash_Config;
+
+	Erase_check = HAL_FLASH_Unlock();
+	if( Erase_check == HAL_OK )
+	{
+		if( start_page == MASS_ERASE_CMD )
+		{
+			Flash_Config.TypeErase = FLASH_TYPEERASE_MASSERASE;
+			Flash_Config.Banks = FLASH_BANK_1 ;
+			Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
+			if( (Erase_check != HAL_OK) ||
+				(PageError != FLASH_ERASE_COMPLETE )
+			   )
+			{
+				status_Check = FLASH_ERASE_FAILED;
+			}
+		}
+		else if( (start_page+Number_ofPages) <= MAX_NUMBER_OF_PAGES )
+		{
+			Flash_Config.TypeErase = FLASH_TYPEERASE_PAGES;
+			Flash_Config.Banks = FLASH_BANK_1 ;
+			Flash_Config.NbPages = MAX_NUMBER_OF_PAGES - start_page;
+			Flash_Config.PageAddress = (uint32_t)(FLASH_BASE+(start_page*1024));
+			Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
+			if( (Erase_check != HAL_OK) ||
+				(PageError != FLASH_ERASE_COMPLETE )
+			   )
+			{
+				status_Check = FLASH_ERASE_FAILED;
+			}
+		}
+		else if( (start_page+Number_ofPages) > MAX_NUMBER_OF_PAGES )
+		{
+			Flash_Config.TypeErase = FLASH_TYPEERASE_PAGES;
+			Flash_Config.Banks = FLASH_BANK_1 ;
+			Flash_Config.NbPages = MAX_NUMBER_OF_PAGES - start_page;
+			Flash_Config.PageAddress = (uint32_t)(FLASH_BASE + (start_page*1024));
+			Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
+			if( (Erase_check != HAL_OK) ||
+				(PageError != FLASH_ERASE_COMPLETE )
+			   )
+			{
+				status_Check = FLASH_ERASE_FAILED;
+			}
+		}
+		HAL_FLASH_Lock();
+	}
+	else
+	{
+		status_Check = FLASH_ERASE_FAILED;
+	}
+	return status_Check;
 
 }
+void Bootloader_Erase_Flash(uint8_t *Host_Buffer)
+{
+	CRC_VERVICATION CRC_status = CRC_MATCH;
+	uint16_t Pcaket_length = Host_Buffer[0] + 1;
+	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
+	FLASH_ERASE_STATUS status_Check = FLASH_ERASE_FAILED;
+	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
+
+	if( CRC_status == CRC_MATCH )
+	{
+		BL_send_ACK(1);
+		status_Check = Perform_Flash_Erase(Host_Buffer[2],Host_Buffer[3]);
+		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
+		if( status_Check == FLASH_ERASE_SUCCEDD )
+		{
+			BL_DEBUG_MESSAGE("ERASE_Succedd \r\n");
+		}
+		else
+		{
+			BL_DEBUG_MESSAGE("ERASE_Failed \r\n");
+		}
+	}
+	else
+	{
+		BL_send_NACK();
+	}
+}
+FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_start_address,uint16_t Payload_Length)
+{
+	HAL_StatusTypeDef Flash_lock_Check = HAL_ERROR;
+	HAL_StatusTypeDef Flash_Program_Write_Check = HAL_ERROR ;
+	FLASH_WRITE_STATUS Flash_write_check = FLASH_WRITE_SUCCEDD;
+	ADDR_VALID_CHECK Address_check = ADDR_INVALID;
+	uint8_t Page_Counter = 0;
+
+	Flash_lock_Check = HAL_FLASH_Unlock();
+	if( Flash_lock_Check == HAL_OK )
+	{
+		Address_check = Address_Verfication_Check(Payload_start_address);
+		if( Address_check == ADDR_VALID )
+		{
+			for(Page_Counter=0;Page_Counter<=(Payload_Length-4);Page_Counter+=4)
+			{
+				Flash_Program_Write_Check = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Payload_start_address+Page_Counter, *((uint32_t *)&Host_payload[Page_Counter]));
+				if( Flash_Program_Write_Check != HAL_OK )
+				{
+					Flash_write_check = FLASH_WRITE_FAILED;
+					break;
+				}
+			}
+		}
+		else
+		{
+			Flash_write_check = FLASH_WRITE_FAILED;
+		}
+		HAL_FLASH_Lock();
+	}
+	else
+	{
+		Flash_write_check = FLASH_WRITE_FAILED;
+	}
+	return Flash_write_check;
+}
+
 void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 {
+	CRC_VERVICATION CRC_status = CRC_MATCH;
+	uint16_t Pcaket_length = Host_Buffer[0] + 1;
+	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
+	FLASH_WRITE_STATUS status_Check = FLASH_WRITE_FAILED;
+	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+	if( CRC_status == CRC_MATCH )
+	{
+		BL_send_ACK(1);
+		status_Check = Perform_Flash_Write((uint8_t *)&Host_Buffer[7],*((uint32_t *)&Host_Buffer[2]),Host_Buffer[6]);
+		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
+		if( status_Check == FLASH_WRITE_SUCCEDD )
+		{
+			BL_DEBUG_MESSAGE("WRITE \r\n");
+		}
+		else
+		{
+			BL_DEBUG_MESSAGE("WRITE \r\n");
+		}
+	}
+	else
+	{
+		BL_send_NACK();
+	}
 }
 void Bootloader_Enable_RW_Protection(uint8_t *Host_Buffer)
 {
