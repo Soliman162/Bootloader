@@ -50,6 +50,7 @@ static ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address);
 static FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPages);
 static FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_start_address,uint16_t Payload_Length);
 static uint8_t GET_Flash_protection_Level(void);
+static FLASH_change_Protaction_STATUS Change_Read_Level(uint32_t cp_RDP_level);
 
 void BL_DEBUG_MESSAGE(char *format,...)
 {
@@ -446,25 +447,83 @@ void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 		BL_send_NACK();
 	}
 }
-void Bootloader_Enable_RW_Protection(uint8_t *Host_Buffer)
+//void Bootloader_Enable_RW_Protection(uint8_t *Host_Buffer)
+//{
+//
+//}
+//void Bootloader_Memory_Read(uint8_t *Host_Buffer)
+//{
+//
+//}
+//void Bootloader_Get_Sector_Protection_Status(uint8_t *Host_Buffer)
+//{
+//
+//}
+//void Bootloader_Read_OTP(uint8_t *Host_Buffer)
+//{
+//
+//}
+FLASH_change_Protaction_STATUS Change_Read_Level(uint32_t cp_RDP_level)
 {
+	FLASH_change_Protaction_STATUS Flash_protaction_level = CHANGE_READ_LEVEL_SUCCEDD;
+	HAL_StatusTypeDef Lock_unlock_check = HAL_ERROR;
+	FLASH_OBProgramInitTypeDef  FLASH_OBProgram;
 
-}
-void Bootloader_Memory_Read(uint8_t *Host_Buffer)
-{
+	Lock_unlock_check = HAL_FLASH_Unlock();
+	if( Lock_unlock_check == HAL_OK )
+	{
+		Lock_unlock_check = HAL_FLASH_OB_Unlock();
+		if( Lock_unlock_check == HAL_OK )
+		{
+			FLASH_OBProgram.OptionType = OPTIONBYTE_RDP;
+			FLASH_OBProgram.WRPState = OB_WRPSTATE_ENABLE;
+			FLASH_OBProgram.WRPPage = OB_WRP_ALLPAGES;
+			FLASH_OBProgram.Banks = FLASH_BANK_1;
 
-}
-void Bootloader_Get_Sector_Protection_Status(uint8_t *Host_Buffer)
-{
+			if( cp_RDP_level == 1 )
+			{
+				FLASH_OBProgram.RDPLevel = OB_RDP_LEVEL_1;
+			}
+			else
+			{
+				FLASH_OBProgram.RDPLevel = OB_RDP_LEVEL_0;
+			}
+			Lock_unlock_check = HAL_FLASHEx_OBProgram(&FLASH_OBProgram);
 
-}
-void Bootloader_Read_OTP(uint8_t *Host_Buffer)
-{
-
+			HAL_FLASH_OB_Launch();
+			HAL_FLASH_OB_Lock();
+			HAL_FLASH_Lock();
+		}
+		else
+		{
+			Flash_protaction_level = CHANGE_READ_LEVEL_FAILED;
+			HAL_FLASH_Lock();
+		}
+	}
+	else
+	{
+		Flash_protaction_level = CHANGE_READ_LEVEL_FAILED;
+		BL_DEBUG_MESSAGE("Couldn't unlock Flash\r\n");
+	}
+	return Flash_protaction_level;
 }
 void Bootloader_Change_Read_Protection_Level(uint8_t *Host_Buffer)
 {
+	CRC_VERVICATION CRC_status = CRC_MATCH;
+	uint16_t Pcaket_length = Host_Buffer[0] + 1;
+	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
+	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+	if( CRC_status == CRC_MATCH )
+	{
+		BL_send_ACK(1);
+		Change_Read_Level(()&Host_Buffer[2]);
+		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
+	}
+	else
+	{
+		BL_send_NACK();
+	}
 }
 
 void JUMP_To_User_App(void)

@@ -96,6 +96,12 @@ typedef enum
 	FLASH_UNLOCKED
 }FLASH_LOCK_STATUS;
 
+typedef enum
+{
+	CHANGE_READ_LEVEL_FAILED = 0,
+	CHANGE_READ_LEVEL_SUCCEDD
+}FLASH_change_Protaction_STATUS;
+
 BL_STATUS BL_Fetch_Host_CMD(void);
 void BL_DEBUG_MESSAGE(char *format,...);
 
