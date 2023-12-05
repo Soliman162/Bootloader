@@ -64,13 +64,12 @@ void BL_DEBUG_MESSAGE(char *format,...)
 
 BL_STATUS BL_Fetch_Host_CMD(void)
 {
-	BL_STATUS cmd_status = BL_ACK;
 	uint8_t Cmd_Size = 0;
+	BL_STATUS cmd_status = BL_ACK;
 	uint8_t Rec_buffer[HOST_CMD_BUFFER_SIZE] = {'\0'};
 
 	if( HAL_UART_Receive(BL_HOST_CMD_UART, (uint8_t*)Rec_buffer, 1, HAL_MAX_DELAY) != HAL_OK )
 	{
-		//BL_DEBUG_MESSAGE("Couldn't Receive command length \r\n");
 		cmd_status = BL_NACK;
 	}
 	else
@@ -79,62 +78,56 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 		if(HAL_UART_Receive(BL_HOST_CMD_UART, (uint8_t*)&Rec_buffer[1], Cmd_Size, HAL_MAX_DELAY) != HAL_OK)
 		{
 			cmd_status = BL_NACK;
-			//BL_DEBUG_MESSAGE("Couldn't Receive command \r\n");
 		}
 		else
 		{
 			switch (Rec_buffer[1])
 			{
 				case CBL_GET_VER_CMD:
-
 					Bootloader_Get_Version(Rec_buffer);
 					break;
 				case CBL_GET_HELP_CMD:
-					//BL_DEBUG_MESSAGE("CBL_GET_HELP_CMD \r\n");
 					Bootloader_Get_Help(Rec_buffer);
 					break;
 				case CBL_GET_CID_CMD:
-					//BL_DEBUG_MESSAGE("CBL_GET_CID_CMD \r\n");
 					Bootloader_Get_Chip_Identification_Number(Rec_buffer);
 					break;
 				case CBL_GET_RDP_STATUS_CMD:
-					//BL_DEBUG_MESSAGE("CBL_GET_RDP_STATUS_CMD \r\n");
 					Bootloader_Read_Protection_Level(Rec_buffer);
 					break;
 				case CBL_GO_TO_ADDR_CMD:
-					//BL_DEBUG_MESSAGE("CBL_GO_TO_ADDR_CMD \r\n");
 					Bootloader_Jump_To_Address(Rec_buffer);
 					break;
 				case CBL_FLASH_ERASE_CMD:
-					//BL_DEBUG_MESSAGE("CBL_FLASH_ERASE_CMD \r\n");
 					Bootloader_Erase_Flash(Rec_buffer);
 					break;
 				case CBL_MEM_WRITE_CMD:
-					//BL_DEBUG_MESSAGE("CBL_MEM_WRITE_CMD \r\n");
 					Bootloader_Memory_Write(Rec_buffer);
 					break;
 //				case CBL_ED_W_PROTECT_CMD:
-//					//BL_DEBUG_MESSAGE("CBL_ED_W_PROTECT_CMD \r\n");
+//					BL_DEBUG_MESSAGE("CBL_ED_W_PROTECT_CMD \r\n");
 //					Bootloader_Enable_RW_Protection(Rec_buffer);
 //					break;
 //				case CBL_MEM_READ_CMD:
-//					//BL_DEBUG_MESSAGE("CBL_MEM_READ_CMD \r\n");
+//					BL_DEBUG_MESSAGE("CBL_MEM_READ_CMD \r\n");
 //					Bootloader_Memory_Read(Rec_buffer);
 //					break;
 //				case CBL_READ_SECTOR_STATUS_CMD:
-//					//BL_DEBUG_MESSAGE("CBL_READ_SECTOR_STATUS_CMD \r\n");
+//					BL_DEBUG_MESSAGE("CBL_READ_SECTOR_STATUS_CMD \r\n");
 //					Bootloader_Get_Sector_Protection_Status(Rec_buffer);
 //					break;
 //				case CBL_OTP_READ_CMD:
-//					//BL_DEBUG_MESSAGE("//BL_DEBUG_MESSAGE \r\n");
+//					BL_DEBUG_MESSAGE("BL_DEBUG_MESSAGE \r\n");
 //					Bootloader_Read_OTP(Rec_buffer);
 //					break;
 //				case CBL_CHANGE_ROP_Level_CMD:
-//					//BL_DEBUG_MESSAGE("CBL_CHANGE_ROP_Level_CMD \r\n");
+//					BL_DEBUG_MESSAGE("CBL_CHANGE_ROP_Level_CMD \r\n");
 //					Bootloader_Change_Read_Protection_Level(Rec_buffer);
 //					break;
 				default:
-					//BL_DEBUG_MESSAGE("Invalid Command \r\n");
+#if DEBUG_MSG_FLAG == 1
+					BL_DEBUG_MESSAGE("Invalid Command \r\n");
+#endif
 					break;
 			}
 		}
@@ -189,15 +182,23 @@ void Bootloader_Get_Version(uint8_t *Host_Buffer)
 	uint16_t Pcaket_length = Host_Buffer[0] + 1;
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
-	//BL_DEBUG_MESSAGE("CBL_GET_VER_CMD \r\n");
 
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_GET_VER_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		BL_send_ACK(4);
 		Send_Data_To_HOST(BL_version, 4);
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
@@ -209,41 +210,61 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_GET_HELP_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		BL_send_ACK(12);
 		Send_Data_To_HOST( (uint8_t *)(&BL_CMD_ARR[0]), 12);
-		JUMP_To_User_App();/******************************************************/
+		//JUMP_To_User_App();/******************************************************/
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
+
 void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 {
 	CRC_VERVICATION CRC_status = CRC_MATCH;
 	uint16_t Pcaket_length = Host_Buffer[0] + 1;
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
-	uint16_t MCU_ID = DBGMCU->IDCODE & 0x00000FFF ;
+	uint16_t MCU_ID = 0 ;
 
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
-
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_GET_CID_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
+		MCU_ID = (uint16_t)((DBGMCU->IDCODE) & 0x00000FFF);
 		BL_send_ACK(2);
 		Send_Data_To_HOST((uint8_t*)&MCU_ID, 2);
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
-uint8_t GET_Flash_protection_Level(void)
+
+static uint8_t GET_Flash_protection_Level(void)
 {
-	static FLASH_OBProgramInitTypeDef *OBProgram;
-	HAL_FLASHEx_OBGetConfig(OBProgram);
-	return OBProgram->RDPLevel;
+	static FLASH_OBProgramInitTypeDef OBProgram;
+	HAL_FLASHEx_OBGetConfig(&OBProgram);
+	return (uint8_t)(OBProgram.RDPLevel);
 }
 
 void Bootloader_Read_Protection_Level(uint8_t *Host_Buffer)
@@ -255,17 +276,27 @@ void Bootloader_Read_Protection_Level(uint8_t *Host_Buffer)
 
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_GET_RDP_STATUS_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
-		RPD_level = GET_Flash_protection_Level();
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		BL_send_ACK(1);
+		RPD_level = GET_Flash_protection_Level();
 		Send_Data_To_HOST((uint8_t *)&RPD_level, 1);
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
+
 void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 {
 	CRC_VERVICATION CRC_status = CRC_MATCH;
@@ -275,25 +306,37 @@ void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 	ADDR_VALID_CHECK Check = ADDR_INVALID;
 
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
-
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_GO_TO_ADDR_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		BL_send_ACK(1);
 		Jump_Addr = *((uint32_t *)&Host_Buffer[2]);
 		Check = Address_Verfication_Check(Jump_Addr);
 		Send_Data_To_HOST((uint8_t *)&Check, 1);
 		if( Check == ADDR_VALID )
 		{
-			//BL_DEBUG_MESSAGE("Address valid 0x%X\r\n",Jump_Addr);
+#if DEBUG_MSG_FLAG == 1
+			BL_DEBUG_MESSAGE("Address valid 0x%X\r\n",Jump_Addr);
+#endif
 			pvfun address = (pvfun)(Jump_Addr+1) ;
 			address();
 		}else
 		{
-			//BL_DEBUG_MESSAGE("Address not valid 0x%X\r\n",Jump_Addr);
+#if DEBUG_MSG_FLAG == 1
+			BL_DEBUG_MESSAGE("Address not valid 0x%X\r\n",Jump_Addr);
+#endif
 		}
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
@@ -366,22 +409,23 @@ void Bootloader_Erase_Flash(uint8_t *Host_Buffer)
 	FLASH_ERASE_STATUS status_Check = FLASH_ERASE_FAILED;
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_FLASH_ERASE_CMD \r\n");
+#endif
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		status_Check = Perform_Flash_Erase(Host_Buffer[2],Host_Buffer[3]);
 		BL_send_ACK(1);
 		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
-		if( status_Check == FLASH_ERASE_SUCCEDD )
-		{
-			//BL_DEBUG_MESSAGE("ERASE_Succedd \r\n");
-		}
-		else
-		{
-			//BL_DEBUG_MESSAGE("ERASE_Failed \r\n");
-		}
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
@@ -430,22 +474,24 @@ void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 	FLASH_WRITE_STATUS status_Check = FLASH_WRITE_FAILED;
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("CBL_MEM_WRITE_CMD \r\n");
+#endif
+
 	if( CRC_status == CRC_MATCH )
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		status_Check = Perform_Flash_Write((uint8_t *)&Host_Buffer[7],*((uint32_t *)&Host_Buffer[2]),Host_Buffer[6]);
 		BL_send_ACK(1);
 		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
-		if( status_Check == FLASH_WRITE_SUCCEDD )
-		{
-			//BL_DEBUG_MESSAGE("WRITE \r\n");
-		}
-		else
-		{
-			//BL_DEBUG_MESSAGE("WRITE \r\n");
-		}
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+	BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
@@ -511,7 +557,10 @@ FLASH_change_Protaction_STATUS Change_Read_Level(uint32_t cp_RDP_level)
 	else
 	{
 		Flash_protaction_level = CHANGE_READ_LEVEL_FAILED;
-		//BL_DEBUG_MESSAGE("Couldn't unlock Flash\r\n");
+#if DEBUG_MSG_FLAG == 1
+		BL_DEBUG_MESSAGE("Couldn't unlock Flash\r\n");
+#endif
+
 	}
 	return Flash_protaction_level;
 }
@@ -525,12 +574,18 @@ void Bootloader_Change_Read_Protection_Level(uint8_t *Host_Buffer)
 
 	if( CRC_status == CRC_MATCH )
 	{
-		Flash_protaction_level = Change_Read_Level((uint32_t)Host_Buffer[2]);
+#if DEBUG_MSG_FLAG == 1
+		BL_DEBUG_MESSAGE("send ACK \r\n");
+#endif
 		BL_send_ACK(1);
+		Flash_protaction_level = Change_Read_Level((uint32_t)Host_Buffer[2]);
 		Send_Data_To_HOST((uint8_t *)&Flash_protaction_level, 1);
 	}
 	else
 	{
+#if DEBUG_MSG_FLAG == 1
+		BL_DEBUG_MESSAGE("send NACK \r\n");
+#endif
 		BL_send_NACK();
 	}
 }
@@ -549,14 +604,11 @@ void JUMP_To_User_App(void)
 ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
 {
 	ADDR_VALID_CHECK Check_addr = ADDR_INVALID;
-	if( (cp_Address >= FLASH_BASE) && (cp_Address <= FLASH_END_ADDRESS) )
+	if( ((cp_Address >= FLASH_BASE) && (cp_Address <= FLASH_END_ADDRESS)) ||
+		((cp_Address >= SRAM_BASE) && (cp_Address <= SRAM_END_ADDRESS))
+	  )
 	{
 		Check_addr = ADDR_VALID;
 	}
-	else if( (cp_Address >= SRAM_BASE) && (cp_Address <= SRAM_END_ADDRESS) )
-	{
-		Check_addr = ADDR_VALID;
-	}
-
 	return Check_addr;
 }

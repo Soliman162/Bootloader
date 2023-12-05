@@ -9,13 +9,15 @@
 #define INC_BOOTLOADER_H_
 
 
+#define DEBUG_MSG_FLAG    0
+
 // command length 1byte + command_code 1byte +  details + crc 4bytes
 
 #define BL_DEBUG_UART			&huart2
 #define BL_HOST_CMD_UART		&huart2
 #define BL_CRC_ENGINE			&hcrc
 
-#define HOST_CMD_BUFFER_SIZE			200
+#define HOST_CMD_BUFFER_SIZE			100
 #define MESSAGE_DEBUG_BUFFER_SIZE		100
 
 /*************************Commands************************/
@@ -45,7 +47,7 @@
 #define BL_SEND_NACK	0xAB
 #define BL_SEND_ACK		0xCD
 
-#define FLASH_SECTOR2_BASE_ADDRESS	0x8003800UL
+#define FLASH_SECTOR2_BASE_ADDRESS	0x08003800UL
 
 #define FLASH_SIZE	(64*1024)
 #define SRAM_SIZE	(20*1024)
