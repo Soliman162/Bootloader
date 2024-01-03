@@ -57,7 +57,7 @@
 
 
 #define FLASH_ERASE_COMPLETE	0xFFFFFFFFUL
-#define MAX_NUMBER_OF_PAGES		64
+#define MAX_NUMBER_OF_PAGES		50
 #define MASS_ERASE_CMD			0xFFUL
 
 typedef void (*pvfun)(void);
