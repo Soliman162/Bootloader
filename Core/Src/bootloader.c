@@ -11,6 +11,7 @@
 #include <memory.h>
 #include "usart.h"
 #include "crc.h"
+#include "gpio.h"
 #include "bootloader.h"
 
 const uint8_t BL_CMD_ARR[12] = {
@@ -38,6 +39,8 @@ static inline void Bootloader_Erase_Flash(uint8_t *Host_Buffer);
 static inline void Bootloader_Memory_Write(uint8_t *Host_Buffer);
 
 static inline void Bootloader_Change_Protection_Level(uint8_t *Host_Buffer);
+
+static void Test_jump(void);
 
 static CRC_VERVICATION BootLoader_CRC_verfiy(uint8_t *Data_arr,uint8_t Data_Length,uint32_t CP_host_crc);
 static void BL_send_ACK(uint8_t Replay_Length);
@@ -81,14 +84,14 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 		{
 			switch (Rec_buffer[1])
 			{
-				case CBL_GET_VER_CMD: Bootloader_Get_Version(Rec_buffer); break;	// 1
-				case CBL_GET_HELP_CMD: Bootloader_Get_Help(Rec_buffer); break;		// 2
-				case CBL_GET_CID_CMD: Bootloader_Get_Chip_Identification_Number(Rec_buffer); break;	// 3
-				case CBL_GET_RDP_STATUS_CMD: Bootloader_Read_Protection_Level(Rec_buffer); break;	// 4
+				case CBL_GET_VER_CMD: Bootloader_Get_Version(Rec_buffer); break;	// ok
+				case CBL_GET_HELP_CMD: Bootloader_Get_Help(Rec_buffer); break;		// ok
+				case CBL_GET_CID_CMD: Bootloader_Get_Chip_Identification_Number(Rec_buffer); break;	// ok
+				case CBL_GET_RDP_STATUS_CMD: Bootloader_Read_Protection_Level(Rec_buffer); break;	// ok
 				case CBL_GO_TO_ADDR_CMD: Bootloader_Jump_To_Address(Rec_buffer); break;
-				case CBL_FLASH_ERASE_CMD: Bootloader_Erase_Flash(Rec_buffer); break;
-				case CBL_MEM_WRITE_CMD: Bootloader_Memory_Write(Rec_buffer); break;
-				case CBL_CHANGE_ROP_Level_CMD: Bootloader_Change_Protection_Level(Rec_buffer); break;
+				case CBL_FLASH_ERASE_CMD: Bootloader_Erase_Flash(Rec_buffer); break; // ok
+				case CBL_MEM_WRITE_CMD: Bootloader_Memory_Write(Rec_buffer); break;	 //
+				case CBL_CHANGE_ROP_Level_CMD: Bootloader_Change_Protection_Level(Rec_buffer); break; // ok
 				default:
 #if DEBUG_MSG_FLAG == 1
 					BL_DEBUG_MESSAGE("Invalid Command \r\n");
@@ -148,8 +151,6 @@ void Bootloader_Get_Version(uint8_t *Host_Buffer)
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 
-	JUMP_To_User_App();
-
 #if DEBUG_MSG_FLAG == 1
 	BL_DEBUG_MESSAGE("CBL_GET_VER_CMD \r\n");
 #endif
@@ -188,6 +189,7 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 		BL_send_ACK(12);
 		Send_Data_To_HOST( (uint8_t *)(&BL_CMD_ARR[0]), 12);
 		//JUMP_To_User_App();/******************************************************/
+		Test_jump();
 	}
 	else
 	{
@@ -328,13 +330,13 @@ FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPag
 		else if( (start_page+Number_ofPages) <= MAX_NUMBER_OF_PAGES )
 		{
 			Flash_Config.NbPages = Number_ofPages;
-			Flash_Config.PageAddress = (uint32_t)(FLASH_BASE+(start_page*1024));
+			Flash_Config.PageAddress = (uint32_t)(FLASH_SECTOR2_BASE_ADDRESS+(start_page*1024));
 		}
 		else if( (start_page+Number_ofPages) > MAX_NUMBER_OF_PAGES )
 		{
 			Number_ofPages = MAX_NUMBER_OF_PAGES - start_page;
 			Flash_Config.NbPages = Number_ofPages;
-			Flash_Config.PageAddress = (uint32_t)(FLASH_BASE + (start_page*1024));
+			Flash_Config.PageAddress = (uint32_t)(FLASH_SECTOR2_BASE_ADDRESS + (start_page*1024));
 		}
 		Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
 		if( (Erase_check != HAL_OK) ||
@@ -395,7 +397,7 @@ FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_st
 		{
 			for(Page_Counter=0;Page_Counter<=(Payload_Length-4);Page_Counter+=4)
 			{
-				Flash_Program_Write_Check = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Payload_start_address+Page_Counter, *((uint32_t *)&Host_payload[Page_Counter]));
+				Flash_Program_Write_Check = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(Payload_start_address+Page_Counter), *((uint32_t *)&Host_payload[Page_Counter]));
 				if( Flash_Program_Write_Check != HAL_OK )
 				{
 					Flash_write_check = FLASH_WRITE_FAILED;
@@ -433,8 +435,8 @@ void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 #if DEBUG_MSG_FLAG == 1
 	BL_DEBUG_MESSAGE("send ACK \r\n");
 #endif
-		status_Check = Perform_Flash_Write((uint8_t *)&Host_Buffer[7],*((uint32_t *)&Host_Buffer[2]),Host_Buffer[6]);
 		BL_send_ACK(1);
+		status_Check = Perform_Flash_Write((uint8_t *)&Host_Buffer[7],*((uint32_t *)&Host_Buffer[2]),Host_Buffer[6]);
 		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
 	}
 	else
@@ -562,3 +564,9 @@ ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
 	}
 	return Check_addr;
 }
+
+static void Test_jump(void)
+{
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+}
+

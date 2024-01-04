@@ -21,7 +21,6 @@
 #include "crc.h"
 #include "usart.h"
 #include "gpio.h"
-#include "bootloader.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -72,7 +71,7 @@ int main(void)
 
   /* MCU Configuration--------------------------------------------------------*/
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -101,7 +100,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  BL_Fetch_Host_CMD();
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
