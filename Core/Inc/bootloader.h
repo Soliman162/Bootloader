@@ -47,7 +47,8 @@
 #define BL_SEND_NACK	0xAB
 #define BL_SEND_ACK		0xCD
 
-#define FLASH_SECTOR2_BASE_ADDRESS	0x08003800UL
+#define FLASH_SECTOR2_BASE_ADDRESS	0x8005400UL
+
 
 #define FLASH_SIZE	(64*1024)
 #define SRAM_SIZE	(20*1024)
@@ -57,7 +58,7 @@
 
 
 #define FLASH_ERASE_COMPLETE	0xFFFFFFFFUL
-#define MAX_NUMBER_OF_PAGES		50
+#define MAX_NUMBER_OF_PAGES		43
 #define MASS_ERASE_CMD			0xFFUL
 
 typedef void (*pvfun)(void);

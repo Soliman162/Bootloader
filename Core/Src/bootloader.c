@@ -88,7 +88,7 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 				case CBL_GET_HELP_CMD: Bootloader_Get_Help(Rec_buffer); break;		// ok
 				case CBL_GET_CID_CMD: Bootloader_Get_Chip_Identification_Number(Rec_buffer); break;	// ok
 				case CBL_GET_RDP_STATUS_CMD: Bootloader_Read_Protection_Level(Rec_buffer); break;	// ok
-				case CBL_GO_TO_ADDR_CMD: Bootloader_Jump_To_Address(Rec_buffer); break;
+				case CBL_GO_TO_ADDR_CMD: Bootloader_Jump_To_Address(Rec_buffer); break; //ok
 				case CBL_FLASH_ERASE_CMD: Bootloader_Erase_Flash(Rec_buffer); break; // ok
 				case CBL_MEM_WRITE_CMD: Bootloader_Memory_Write(Rec_buffer); break;	 //
 				case CBL_CHANGE_ROP_Level_CMD: Bootloader_Change_Protection_Level(Rec_buffer); break; // ok
@@ -216,8 +216,8 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 #if DEBUG_MSG_FLAG == 1
 	BL_DEBUG_MESSAGE("send ACK \r\n");
 #endif
-		MCU_ID = (uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
 		BL_send_ACK(2);
+		MCU_ID = (uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
 		Send_Data_To_HOST((uint8_t*)&MCU_ID, 2);
 	}
 	else
@@ -294,6 +294,7 @@ void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 #endif
 			pvfun address = (pvfun)(Jump_Addr+1) ;
 			address();
+			/**************************************/JUMP_To_User_App();/**************************************/
 		}else
 		{
 #if DEBUG_MSG_FLAG == 1
@@ -397,7 +398,9 @@ FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_st
 		{
 			for(Page_Counter=0;Page_Counter<=(Payload_Length-4);Page_Counter+=4)
 			{
-				Flash_Program_Write_Check = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(Payload_start_address+Page_Counter), *((uint32_t *)&Host_payload[Page_Counter]));
+				Flash_Program_Write_Check = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
+															 (uint32_t)(Payload_start_address+Page_Counter),
+															*((uint32_t *)&Host_payload[Page_Counter]));
 				if( Flash_Program_Write_Check != HAL_OK )
 				{
 					Flash_write_check = FLASH_WRITE_FAILED;
@@ -435,8 +438,8 @@ void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 #if DEBUG_MSG_FLAG == 1
 	BL_DEBUG_MESSAGE("send ACK \r\n");
 #endif
-		BL_send_ACK(1);
 		status_Check = Perform_Flash_Write((uint8_t *)&Host_Buffer[7],*((uint32_t *)&Host_Buffer[2]),Host_Buffer[6]);
+		BL_send_ACK(1);
 		Send_Data_To_HOST((uint8_t *)&status_Check, 1);
 	}
 	else
@@ -447,22 +450,6 @@ void Bootloader_Memory_Write(uint8_t *Host_Buffer)
 		BL_send_NACK();
 	}
 }
-//void Bootloader_Enable_RW_Protection(uint8_t *Host_Buffer)
-//{
-//
-//}
-//void Bootloader_Memory_Read(uint8_t *Host_Buffer)
-//{
-//
-//}
-//void Bootloader_Get_Sector_Protection_Status(uint8_t *Host_Buffer)
-//{
-//
-//}
-//void Bootloader_Read_OTP(uint8_t *Host_Buffer)
-//{
-//
-//}
 FLASH_change_Protaction_STATUS Change_Read_Level(uint32_t cp_RDP_level)
 {
 	FLASH_change_Protaction_STATUS Flash_protaction_level = CHANGE_READ_LEVEL_SUCCEDD;
@@ -544,13 +531,21 @@ void Bootloader_Change_Protection_Level(uint8_t *Host_Buffer)
 
 void JUMP_To_User_App(void)
 {
-	uint32_t APP_MSP = *((volatile uint32_t *)FLASH_SECTOR2_BASE_ADDRESS);
-	uint32_t APP_Entry_Point = *(( volatile uint32_t *)(APP_MSP+4));
+	uint32_t APP_MSP = *((__IO uint32_t *)FLASH_SECTOR2_BASE_ADDRESS);
+	uint32_t * APP_Entry_Point = (( __IO uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4));
 	pvfun App_Reset_Handler = (pvfun)APP_Entry_Point;
 	__set_MSP(APP_MSP);
-	HAL_DeInit();
-	HAL_RCC_DeInit();
+
+//	HAL_DeInit();
+//	HAL_RCC_DeInit();
+	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;//FLASH_BASE | 0x5400Ul;
 	App_Reset_Handler();
+
+//	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;//FLASH_BASE | 0x5400Ul;
+//
+//	uint32_t *  APP_Entry_Point =  ((uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4+1));
+//	pvfun App_Reset_Handler = (pvfun) APP_Entry_Point;
+//	App_Reset_Handler();
 }
 
 ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
