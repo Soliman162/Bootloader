@@ -217,7 +217,7 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 	BL_DEBUG_MESSAGE("send ACK \r\n");
 #endif
 		BL_send_ACK(2);
-		MCU_ID = (uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
+		MCU_ID = (uint16_t)HAL_GetDEVID(); //(uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
 		Send_Data_To_HOST((uint8_t*)&MCU_ID, 2);
 	}
 	else
@@ -532,20 +532,14 @@ void Bootloader_Change_Protection_Level(uint8_t *Host_Buffer)
 void JUMP_To_User_App(void)
 {
 	uint32_t APP_MSP = *((__IO uint32_t *)FLASH_SECTOR2_BASE_ADDRESS);
-	uint32_t * APP_Entry_Point = (( __IO uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4));
+	uint32_t APP_Entry_Point = (uint32_t)(*( __IO uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4));
 	pvfun App_Reset_Handler = (pvfun)APP_Entry_Point;
 	__set_MSP(APP_MSP);
 
 //	HAL_DeInit();
 //	HAL_RCC_DeInit();
-	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;//FLASH_BASE | 0x5400Ul;
+//	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;
 	App_Reset_Handler();
-
-//	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;//FLASH_BASE | 0x5400Ul;
-//
-//	uint32_t *  APP_Entry_Point =  ((uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4+1));
-//	pvfun App_Reset_Handler = (pvfun) APP_Entry_Point;
-//	App_Reset_Handler();
 }
 
 ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
