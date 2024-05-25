@@ -46,7 +46,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-
+void SVC_Handler_Main(uint8_t *svc_args);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -147,7 +147,14 @@ void SVC_Handler(void)
 
   /* USER CODE END SVCall_IRQn 0 */
   /* USER CODE BEGIN SVCall_IRQn 1 */
-
+	__ASM volatile (
+			".global SVC_Handler_Main\n"
+			"TST lr, #4\n"
+			"ITE EQ\n"
+			"MRSEQ r0, MSP\n"
+			"MRSNE r0, PSP\n"
+			"B SVC_Handler_Main\n"
+	);
   /* USER CODE END SVCall_IRQn 1 */
 }
 
@@ -199,5 +206,18 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
+void SVC_Handler_Main(uint8_t *svc_args)
+{
+	uint8_t SVC_number;
 
+	SVC_number = ((char *)svc_args[6])[-2];
+
+	switch (SVC_number) {
+		case 0:		/*Enable privlledge mode*/
+				__set_CONTROL(__get_CONTROL() & ~CONTROL_nPRIV_Msk);
+			break;
+		default:
+			break;
+	}
+}
 /* USER CODE END 1 */

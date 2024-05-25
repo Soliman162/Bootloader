@@ -14,6 +14,10 @@
 #include "gpio.h"
 #include "bootloader.h"
 
+
+
+#define Enable_Privileged_Mode() __ASM volatile ("SVC #0")
+
 const uint8_t BL_CMD_ARR[12] = {
 		CBL_GET_VER_CMD,
 		CBL_GET_HELP_CMD,
@@ -52,6 +56,9 @@ static FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Numbe
 static FLASH_WRITE_STATUS Perform_Flash_Write(uint8_t *Host_payload,uint32_t Payload_start_address,uint16_t Payload_Length);
 static uint8_t GET_Flash_protection_Level(void);
 static FLASH_change_Protaction_STATUS Change_Read_Level(uint32_t cp_RDP_level);
+
+static void BootJump(uint32_t App_Address);
+__attribute__ ((naked,noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH);
 
 void BL_DEBUG_MESSAGE(char *format,...)
 {
@@ -123,7 +130,7 @@ CRC_VERVICATION BootLoader_CRC_verfiy(uint8_t *Data_arr,uint8_t Data_Length,uint
 
 	if( CRC_calculated == CP_host_crc )
 	{
-		CRC_status = CRC_MATCH;
+		CRC_status = CRC_MATCH; SVC_Handler()
 	}
 	else
 	{
@@ -190,6 +197,7 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 		Send_Data_To_HOST( (uint8_t *)(&BL_CMD_ARR[0]), 12);
 		//JUMP_To_User_App();/******************************************************/
 		Test_jump();
+		/******************************/JUMP_To_User_App();
 	}
 	else
 	{
@@ -326,18 +334,18 @@ FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPag
 		if( start_page == MASS_ERASE_CMD )
 		{
 			Flash_Config.NbPages = 50;//MAX_NUMBER_OF_PAGES - start_page;
-			Flash_Config.PageAddress = (uint32_t)FLASH_SECTOR2_BASE_ADDRESS; //(uint32_t)(FLASH_BASE+(start_page*1024));
+			Flash_Config.PageAddress = (uint32_t)FLASH_USER_APP_BASE_ADDRESS; //(uint32_t)(FLASH_BASE+(start_page*1024));
 		}
 		else if( (start_page+Number_ofPages) <= MAX_NUMBER_OF_PAGES )
 		{
 			Flash_Config.NbPages = Number_ofPages;
-			Flash_Config.PageAddress = (uint32_t)(FLASH_SECTOR2_BASE_ADDRESS+(start_page*1024));
+			Flash_Config.PageAddress = (uint32_t)(FLASH_USER_APP_BASE_ADDRESS+(start_page*1024));
 		}
 		else if( (start_page+Number_ofPages) > MAX_NUMBER_OF_PAGES )
 		{
 			Number_ofPages = MAX_NUMBER_OF_PAGES - start_page;
 			Flash_Config.NbPages = Number_ofPages;
-			Flash_Config.PageAddress = (uint32_t)(FLASH_SECTOR2_BASE_ADDRESS + (start_page*1024));
+			Flash_Config.PageAddress = (uint32_t)(FLASH_USER_APP_BASE_ADDRESS + (start_page*1024));
 		}
 		Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
 		if( (Erase_check != HAL_OK) ||
@@ -531,15 +539,52 @@ void Bootloader_Change_Protection_Level(uint8_t *Host_Buffer)
 
 void JUMP_To_User_App(void)
 {
-	uint32_t APP_MSP = *((__IO uint32_t *)FLASH_SECTOR2_BASE_ADDRESS);
-	uint32_t APP_Entry_Point = (uint32_t)(*( __IO uint32_t *)(FLASH_SECTOR2_BASE_ADDRESS+4));
-	pvfun App_Reset_Handler = (pvfun)APP_Entry_Point;
-	__set_MSP(APP_MSP);
+	/* make sure that the CPU in Privileged mode*/
+	if( CONTROL_nPRIV_Msk & __get_CONTROL() )
+	{
+		/* not in Privileged enable Privileged*/
+		Enable_Privileged_Mode();
+	}
+	/* Disable All iterrupts*/
+	for( uint_fast8_t Intrrupt=WWDG_IRQn;Intrrupt <= USBWakeUp_IRQn;Intrrupt++)
+	{
+		HAL_NVIC_DisableIRQ(Intrrupt);
+	}
+	/*Disable all prephrals */
+	HAL_UART_DeInit(&huart2);
+	HAL_UART_DeInit(&huart3);
+	HAL_CRC_DeInit(&hcrc);
+	/* CLEAR interrupts pending flags*/
+	for( uint_fast8_t Intrrupt=WWDG_IRQn;Intrrupt <= USBWakeUp_IRQn;Intrrupt++)
+	{
+		HAL_NVIC_ClearPendingIRQ(Intrrupt);
+	}
+	/*Disable systick and clear its exeption pending*/
+	SysTick->CTRL = 0;
+	SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk;
 
-//	HAL_DeInit();
-//	HAL_RCC_DeInit();
-//	SCB->VTOR = FLASH_SECTOR2_BASE_ADDRESS;
-	App_Reset_Handler();
+	SCB->SHCSR &= ~(SCB_SHCSR_BUSFAULTENA_Msk |
+					SCB_SHCSR_MEMFAULTENA_Msk |
+					SCB_SHCSR_USGFAULTENA_Msk);
+
+	if( CONTROL_SPSEL_Msk & __get_CONTROL())
+	{
+		__set_MSP(__get_PSP());
+		__set_CONTROL(__get_CONTROL() & ~CONTROL_SPSEL_Msk);
+	}
+	SCB->VTOR = (uint32_t) FLASH_USER_APP_BASE_ADDRESS;
+	BootJump(FLASH_USER_APP_BASE_ADDRESS);
+}
+void BootJump(uint32_t App_Address)
+{
+	uint32_t APP_MSP = (uint32_t)(*((__IO uint32_t *)App_Address));
+	uint32_t App_Reset_Handler = (uint32_t)(*(( __IO uint32_t *)(App_Address+4)));
+	BootJumpASM(APP_MSP,App_Reset_Handler);
+}
+__attribute__ ((naked,noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH)
+{
+	__ASM("MSR	MSP,r0");
+	__ASM("BX	r1");
 }
 
 ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
