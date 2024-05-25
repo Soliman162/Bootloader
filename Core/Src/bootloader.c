@@ -18,6 +18,8 @@
 
 #define Enable_Privileged_Mode() __ASM volatile ("SVC #0")
 
+uint8_t Rec_buffer[HOST_CMD_BUFFER_SIZE] = {'\0'};
+
 const uint8_t BL_CMD_ARR[12] = {
 		CBL_GET_VER_CMD,
 		CBL_GET_HELP_CMD,
@@ -74,7 +76,6 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 {
 	uint8_t Cmd_Size = 0;
 	BL_STATUS cmd_status = BL_ACK;
-	uint8_t Rec_buffer[HOST_CMD_BUFFER_SIZE] = {'\0'};
 
 	if( HAL_UART_Receive(BL_HOST_CMD_UART, (uint8_t*)Rec_buffer, 1, HAL_MAX_DELAY) != HAL_OK )
 	{
@@ -91,24 +92,26 @@ BL_STATUS BL_Fetch_Host_CMD(void)
 		{
 			switch (Rec_buffer[1])
 			{
-				case CBL_GET_VER_CMD: Bootloader_Get_Version(Rec_buffer); break;	// ok
-				case CBL_GET_HELP_CMD: Bootloader_Get_Help(Rec_buffer); break;		// ok
-				case CBL_GET_CID_CMD: Bootloader_Get_Chip_Identification_Number(Rec_buffer); break;	// ok
-				case CBL_GET_RDP_STATUS_CMD: Bootloader_Read_Protection_Level(Rec_buffer); break;	// ok
-				case CBL_GO_TO_ADDR_CMD: Bootloader_Jump_To_Address(Rec_buffer); break; //ok
-				case CBL_FLASH_ERASE_CMD: Bootloader_Erase_Flash(Rec_buffer); break; // ok
-				case CBL_MEM_WRITE_CMD: Bootloader_Memory_Write(Rec_buffer); break;	 //
-				case CBL_CHANGE_ROP_Level_CMD: Bootloader_Change_Protection_Level(Rec_buffer); break; // ok
+				case CBL_GET_VER_CMD: Bootloader_Get_Version(Rec_buffer); break;
+				case CBL_GET_HELP_CMD: Bootloader_Get_Help(Rec_buffer); break;
+				case CBL_GET_CID_CMD: Bootloader_Get_Chip_Identification_Number(Rec_buffer); break;
+				case CBL_GET_RDP_STATUS_CMD: Bootloader_Read_Protection_Level(Rec_buffer); break;
+				case CBL_GO_TO_ADDR_CMD: Bootloader_Jump_To_Address(Rec_buffer); break;
+				case CBL_FLASH_ERASE_CMD: Bootloader_Erase_Flash(Rec_buffer); break;
+				case CBL_MEM_WRITE_CMD: Bootloader_Memory_Write(Rec_buffer); break;
+				case CBL_CHANGE_ROP_Level_CMD: Bootloader_Change_Protection_Level(Rec_buffer); break;
 				default:
 #if DEBUG_MSG_FLAG == 1
 					BL_DEBUG_MESSAGE("Invalid Command \r\n");
 #endif
+					Error_Handler();
 					break;
 			}
 		}
 	}
 	return cmd_status;
 }
+
 static void Send_Data_To_HOST(uint8_t *pdata , uint8_t Size)
 {
 	HAL_UART_Transmit(BL_HOST_CMD_UART, pdata, Size, HAL_MAX_DELAY);
@@ -224,6 +227,7 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 		BL_send_ACK(2);
 		MCU_ID = (uint16_t)HAL_GetDEVID(); //(uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
 		Send_Data_To_HOST((uint8_t*)&MCU_ID, 2);
+		/**********************************************/JUMP_To_User_App();
 	}
 	else
 	{
@@ -550,7 +554,7 @@ void JUMP_To_User_App(void)
 	if( CONTROL_nPRIV_Msk & __get_CONTROL() )
 	{
 		/* not in Privileged enable Privileged*/
-		Enable_Privileged_Mode(); SVC_Handler()
+		Enable_Privileged_Mode();
 	}
 	/* Disable All interrupt*/
 	__disable_irq();

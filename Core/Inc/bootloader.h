@@ -17,7 +17,7 @@
 #define BL_HOST_CMD_UART		&huart2
 #define BL_CRC_ENGINE			&hcrc
 
-#define HOST_CMD_BUFFER_SIZE			100
+#define HOST_CMD_BUFFER_SIZE			1000
 #define MESSAGE_DEBUG_BUFFER_SIZE		100
 
 /*************************Commands************************/
