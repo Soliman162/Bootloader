@@ -130,7 +130,7 @@ CRC_VERVICATION BootLoader_CRC_verfiy(uint8_t *Data_arr,uint8_t Data_Length,uint
 
 	if( CRC_calculated == CP_host_crc )
 	{
-		CRC_status = CRC_MATCH; SVC_Handler()
+		CRC_status = CRC_MATCH;
 	}
 	else
 	{
@@ -195,9 +195,6 @@ void Bootloader_Get_Help(uint8_t *Host_Buffer)
 #endif
 		BL_send_ACK(12);
 		Send_Data_To_HOST( (uint8_t *)(&BL_CMD_ARR[0]), 12);
-		//JUMP_To_User_App();/******************************************************/
-		Test_jump();
-		/******************************/JUMP_To_User_App();
 	}
 	else
 	{
@@ -300,9 +297,8 @@ void Bootloader_Jump_To_Address(uint8_t *Host_Buffer)
 #if DEBUG_MSG_FLAG == 1
 			BL_DEBUG_MESSAGE("Address valid 0x%X\r\n",Jump_Addr);
 #endif
-			pvfun address = (pvfun)(Jump_Addr+1) ;
+			pvfun address = (pvfun)(Jump_Addr+1);
 			address();
-			/**************************************/JUMP_To_User_App();/**************************************/
 		}else
 		{
 #if DEBUG_MSG_FLAG == 1
@@ -333,8 +329,8 @@ FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPag
 		Flash_Config.Banks = FLASH_BANK_1 ;
 		if( start_page == MASS_ERASE_CMD )
 		{
-			Flash_Config.NbPages = 50;//MAX_NUMBER_OF_PAGES - start_page;
-			Flash_Config.PageAddress = (uint32_t)FLASH_USER_APP_BASE_ADDRESS; //(uint32_t)(FLASH_BASE+(start_page*1024));
+			Flash_Config.NbPages = MAX_NUMBER_OF_PAGES;
+			Flash_Config.PageAddress = (uint32_t)FLASH_USER_APP_BASE_ADDRESS;
 		}
 		else if( (start_page+Number_ofPages) <= MAX_NUMBER_OF_PAGES )
 		{
@@ -348,8 +344,7 @@ FLASH_ERASE_STATUS Perform_Flash_Erase(uint8_t start_page , uint8_t Number_ofPag
 			Flash_Config.PageAddress = (uint32_t)(FLASH_USER_APP_BASE_ADDRESS + (start_page*1024));
 		}
 		Erase_check = HAL_FLASHEx_Erase(&Flash_Config, &PageError);
-		if( (Erase_check != HAL_OK) ||
-			(PageError != FLASH_ERASE_COMPLETE )
+		if( (Erase_check != HAL_OK) || (PageError != FLASH_ERASE_COMPLETE )
 		   )
 		{
 			status_Check = FLASH_ERASE_FAILED;
@@ -537,56 +532,6 @@ void Bootloader_Change_Protection_Level(uint8_t *Host_Buffer)
 	}
 }
 
-void JUMP_To_User_App(void)
-{
-	/* make sure that the CPU in Privileged mode*/
-	if( CONTROL_nPRIV_Msk & __get_CONTROL() )
-	{
-		/* not in Privileged enable Privileged*/
-		Enable_Privileged_Mode();
-	}
-	/* Disable All iterrupts*/
-	for( uint_fast8_t Intrrupt=WWDG_IRQn;Intrrupt <= USBWakeUp_IRQn;Intrrupt++)
-	{
-		HAL_NVIC_DisableIRQ(Intrrupt);
-	}
-	/*Disable all prephrals */
-	HAL_UART_DeInit(&huart2);
-	HAL_UART_DeInit(&huart3);
-	HAL_CRC_DeInit(&hcrc);
-	/* CLEAR interrupts pending flags*/
-	for( uint_fast8_t Intrrupt=WWDG_IRQn;Intrrupt <= USBWakeUp_IRQn;Intrrupt++)
-	{
-		HAL_NVIC_ClearPendingIRQ(Intrrupt);
-	}
-	/*Disable systick and clear its exeption pending*/
-	SysTick->CTRL = 0;
-	SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk;
-
-	SCB->SHCSR &= ~(SCB_SHCSR_BUSFAULTENA_Msk |
-					SCB_SHCSR_MEMFAULTENA_Msk |
-					SCB_SHCSR_USGFAULTENA_Msk);
-
-	if( CONTROL_SPSEL_Msk & __get_CONTROL())
-	{
-		__set_MSP(__get_PSP());
-		__set_CONTROL(__get_CONTROL() & ~CONTROL_SPSEL_Msk);
-	}
-	SCB->VTOR = (uint32_t) FLASH_USER_APP_BASE_ADDRESS;
-	BootJump(FLASH_USER_APP_BASE_ADDRESS);
-}
-void BootJump(uint32_t App_Address)
-{
-	uint32_t APP_MSP = (uint32_t)(*((__IO uint32_t *)App_Address));
-	uint32_t App_Reset_Handler = (uint32_t)(*(( __IO uint32_t *)(App_Address+4)));
-	BootJumpASM(APP_MSP,App_Reset_Handler);
-}
-__attribute__ ((naked,noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH)
-{
-	__ASM("MSR	MSP,r0");
-	__ASM("BX	r1");
-}
-
 ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
 {
 	ADDR_VALID_CHECK Check_addr = ADDR_INVALID;
@@ -597,6 +542,54 @@ ADDR_VALID_CHECK Address_Verfication_Check(uint32_t cp_Address)
 		Check_addr = ADDR_VALID;
 	}
 	return Check_addr;
+}
+
+void JUMP_To_User_App(void)
+{
+	/* make sure that the CPU in Privileged mode*/
+	if( CONTROL_nPRIV_Msk & __get_CONTROL() )
+	{
+		/* not in Privileged enable Privileged*/
+		Enable_Privileged_Mode(); SVC_Handler()
+	}
+	/* Disable All interrupt*/
+	__disable_irq();
+	/*Disable all peripherals */
+	HAL_DeInit();
+	/*Disable RCC */
+	HAL_RCC_DeInit();
+	/* CLEAR interrupts pending flags*/
+	for( uint_fast8_t interrupt=WWDG_IRQn;interrupt <= USBWakeUp_IRQn;interrupt++)
+	{
+		HAL_NVIC_ClearPendingIRQ(interrupt);
+	}
+	/*Disable SYStick and clear its exception pending*/
+	SysTick->CTRL = 0;
+	SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk;
+	SCB->SHCSR &= ~(SCB_SHCSR_BUSFAULTENA_Msk | SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_USGFAULTENA_Msk);
+
+	if( CONTROL_SPSEL_Msk & __get_CONTROL())
+	{
+		__set_MSP(__get_PSP());
+		__set_CONTROL(__get_CONTROL() & ~CONTROL_SPSEL_Msk);
+	}
+	/* Reallocate Vector table*/
+	SCB->VTOR = (uint32_t) FLASH_USER_APP_BASE_ADDRESS;
+	/*Jump to user Application*/
+	BootJump(FLASH_USER_APP_BASE_ADDRESS);
+}
+
+void BootJump(uint32_t App_Address)
+{
+	uint32_t APP_MSP = (uint32_t)(*((__IO uint32_t *)App_Address));
+	uint32_t App_Reset_Handler = (uint32_t)(*(( __IO uint32_t *)(App_Address+4)));
+	BootJumpASM(APP_MSP,App_Reset_Handler);
+}
+
+__attribute__ ((naked,noreturn)) void BootJumpASM(uint32_t SP, uint32_t RH)
+{
+	__ASM("MSR	MSP,r0");
+	__ASM("BX	r1");
 }
 
 static void Test_jump(void)
