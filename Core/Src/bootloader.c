@@ -213,7 +213,8 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 	CRC_VERVICATION CRC_status = CRC_MATCH;
 	uint16_t Pcaket_length = Host_Buffer[0] + 1;
 	uint32_t Host_CRC = *((uint32_t *)(Host_Buffer+(Pcaket_length-4)));
-	uint16_t MCU_ID = 0 ;
+	uint32_t MCU_ID = 0 ;
+	uint8_t Replay_Length = sizeof(MCU_ID);
 
 	CRC_status = BootLoader_CRC_verfiy(Host_Buffer,Pcaket_length-4,Host_CRC);
 #if DEBUG_MSG_FLAG == 1
@@ -224,10 +225,9 @@ void Bootloader_Get_Chip_Identification_Number(uint8_t *Host_Buffer)
 #if DEBUG_MSG_FLAG == 1
 	BL_DEBUG_MESSAGE("send ACK \r\n");
 #endif
-		BL_send_ACK(2);
-		MCU_ID = (uint16_t)HAL_GetDEVID(); //(uint16_t)(DBGMCU->IDCODE & 0x00000FFF);
-		Send_Data_To_HOST((uint8_t*)&MCU_ID, 2);
-		/**********************************************/JUMP_To_User_App();
+		BL_send_ACK(Replay_Length);
+		MCU_ID = HAL_GetDEVID();
+		Send_Data_To_HOST((uint8_t*)&MCU_ID, Replay_Length);
 	}
 	else
 	{
